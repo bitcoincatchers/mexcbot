@@ -1,0 +1,15 @@
+[Unit]
+Description=Alex's Telegram Bot - MEXC Verification
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/alex_telegram_bot_v2
+Environment=PATH=/opt/alex_telegram_bot_v2/venv/bin
+ExecStart=/opt/alex_telegram_bot_v2/venv/bin/python main.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

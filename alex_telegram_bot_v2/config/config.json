@@ -1,0 +1,18 @@
+{
+    "bot": {
+        "name": "Alex MEXC Verification Bot",
+        "version": "2.0.0",
+        "description": "$50 to $500 Crypto Trading Challenge Bot"
+    },
+    "telegram": {
+        "token": "8016598513:AAFtYbJD6vOXpIH9t8wu_-nSfBJmSn2KQNk"
+    },
+    "mexc": {
+        "api_key": "mx0vgl6Q1sImSUitga",
+        "secret": "b79a8e0f6a4b4730a0e7e198e5b5e110",
+        "base_url": "https://api.mexc.com"
+    },
+    "groups": {
+        "vip_group": "https://t.me/+S4YxyCi0aEU3ZTA0"
+    }
+}

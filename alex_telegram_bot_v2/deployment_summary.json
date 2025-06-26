@@ -1,0 +1,25 @@
+{
+  "project_name": "Alex's Telegram Bot v2.0",
+  "deployment_date": "2025-06-26T10:48:48.841608",
+  "version": "2.0.0",
+  "features": [
+    "Smart UID detection (8-digit automatic recognition)",
+    "Case insensitive format support",
+    "Updated $50-$500 challenge messaging",
+    "MEXC API integration",
+    "Inline keyboard navigation",
+    "Production-ready deployment"
+  ],
+  "credentials": {
+    "telegram_token": "8016598513:AAFtYbJD6vOXpIH9t8wu_-nSfBJmSn2KQNk",
+    "mexc_api_key": "mx0vgl6Q1sImSUitga",
+    "mexc_secret": "b79a8e0f6a4b4730a0e7e198e5b5e110",
+    "vip_group": "https://t.me/+S4YxyCi0aEU3ZTA0"
+  },
+  "quick_start": [
+    "1. Extract alex_telegram_bot_v2_complete.zip",
+    "2. cd alex_telegram_bot_v2",
+    "3. pip install -r requirements.txt",
+    "4. python main.py"
+  ]
+}
