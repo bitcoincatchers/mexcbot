@@ -90,7 +90,9 @@ class MEXCAPIClient:
             logger.error(f"Error al obtener UIDs de referidos: {e}")
             return []
         finally:
-            await self.close_session()
+            if self.session:
+                await self.session.close()
+                self.session = None
     
     async def verify_uid(self, uid: str) -> bool:
         if not self.referral_uids:
@@ -105,8 +107,7 @@ class TelegramBot:
         self.uid_pattern = re.compile(r'\b\d{8}\b')
         
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        welcome_message = """
-🚀 ¡Bienvenido al reto de 50$ a 500$ con Cripto Trading! 🚀
+        welcome_message = """🚀 ¡Bienvenido al reto de 50$ a 500$ con Cripto Trading! 🚀
 
 Antes de empezar necesitaremos verificar tu UID de mexc
 
@@ -117,8 +118,7 @@ Una vez registrado , haz click la parte superior derecha , en el icono de tu cue
 Esta te mostrará tu correo electrónico y tu número de usuario UID.
 
 Por favor haz click aquí /verify o escribe /verify
-Y pega tu numero de UID que se forma por 8 dígitos.
-        """
+Y pega tu numero de UID que se forma por 8 dígitos."""
         
         keyboard = [
             [InlineKeyboardButton("🔐 /verify", callback_data="verify_uid")]
@@ -131,8 +131,7 @@ Y pega tu numero de UID que se forma por 8 dígitos.
         )
     
     async def verify_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        verification_message = """
-🔍 **Verificación de UID de MEXC**
+        verification_message = """🔍 **Verificación de UID de MEXC**
 
 Por favor envía tu UID de MEXC (8 dígitos).
 
@@ -142,8 +141,7 @@ Por favor envía tu UID de MEXC (8 dígitos).
 3. Busca "UID" o "User ID"
 4. Copia los 8 números
 
-📱 **Envía tu UID** (ejemplo: 12345678)
-        """
+📱 **Envía tu UID** (ejemplo: 12345678)"""
         
         await update.message.reply_text(verification_message)
         context.user_data['awaiting_uid'] = True
@@ -152,8 +150,7 @@ Por favor envía tu UID de MEXC (8 dígitos).
         query = update.callback_query
         await query.answer()
         
-        verification_message = """
-🔍 **Verificación de UID de MEXC**
+        verification_message = """🔍 **Verificación de UID de MEXC**
 
 Por favor envía tu UID de MEXC (8 dígitos).
 
@@ -163,8 +160,7 @@ Por favor envía tu UID de MEXC (8 dígitos).
 3. Busca "UID" o "User ID"  
 4. Copia los 8 números
 
-📱 **Envía tu UID** (ejemplo: 12345678)
-        """
+📱 **Envía tu UID** (ejemplo: 12345678)"""
         
         await query.edit_message_text(verification_message)
         context.user_data['awaiting_uid'] = True
@@ -181,27 +177,23 @@ Por favor envía tu UID de MEXC (8 dígitos).
             await self.verify_uid_process(update, context, uid)
         elif context.user_data.get('awaiting_uid', False):
             await update.message.reply_text(
-                "❌ **UID inválido**\n\n"
-                "Por favor, envía exactamente 8 dígitos. Ejemplo: 12345678"
+                "❌ **UID inválido**\n\nPor favor, envía exactamente 8 dígitos. Ejemplo: 12345678"
             )
     
     async def verify_uid_process(self, update: Update, context: ContextTypes.DEFAULT_TYPE, uid: str):
         verification_msg = await update.message.reply_text(
-            "🔄 **Verificando tu UID...**\n\n"
-            "Estoy comprobando si eres un referido de Alex en MEXC."
+            "🔄 **Verificando tu UID...**\n\nEstoy comprobando si eres un referido de Alex en MEXC."
         )
         
         try:
             is_verified = await self.mexc_client.verify_uid(uid)
             
             if is_verified:
-                success_message = f"""
-✅ **Perfecto!** , hemos verificado tu numero de UID y estás registrado correctamente, puedes unirte al reto 50$ - 500$ haciendo click aquí:
+                success_message = f"""✅ **Perfecto!** , hemos verificado tu numero de UID y estás registrado correctamente, puedes unirte al reto 50$ - 500$ haciendo click aquí:
 
 👉 {self.vip_group_id}
 
-🚀 **¡Bienvenido al reto!**
-                """
+🚀 **¡Bienvenido al reto!**"""
                 
                 keyboard = [
                     [InlineKeyboardButton("🎯 Unirse al Reto 50$ - 500$", url=self.vip_group_id)]
@@ -212,8 +204,7 @@ Por favor envía tu UID de MEXC (8 dígitos).
                 logger.info(f"Usuario verificado: {update.effective_user.id}, UID: {uid}")
                 
             else:
-                fail_message = """
-❌ **Vaya!** , parece que no encontramos tu UID de usuario.
+                fail_message = """❌ **Vaya!** , parece que no encontramos tu UID de usuario.
 
 Por favor asegurate de registrarte en MEXC con este enlace:
 https://www.mexc.com/es/acquisition/custom-sign-up?shareCode=mexc-15AJc
@@ -225,8 +216,7 @@ Por favor haz click aquí /verify o escribe /verify
 Y pega tu numero de UID que se forma por 8 dígitos.
 
 Si tienes algún problema contacta con alex directamente haciendo click aquí:
-@alex.worksout
-                """
+@alex.worksout"""
                 
                 keyboard = [
                     [InlineKeyboardButton("📝 Registrarse en MEXC", url="https://www.mexc.com/es/acquisition/custom-sign-up?shareCode=mexc-15AJc")],
@@ -241,21 +231,28 @@ Si tienes algún problema contacta con alex directamente haciendo click aquí:
         except Exception as e:
             logger.error(f"Error en verificación: {e}")
             await verification_msg.edit_text(
-                "❌ **Error de Verificación**\n\n"
-                "Hubo un problema técnico. Por favor, inténtalo de nuevo en unos minutos."
+                "❌ **Error de Verificación**\n\nHubo un problema técnico. Por favor, inténtalo de nuevo en unos minutos."
             )
         
         context.user_data['awaiting_uid'] = False
 
-def main():
+async def main():
     logger.info("🚀 Iniciando bot del reto 50$ - 500$ de Alex...")
     
+    # Crear cliente MEXC
     mexc_client = MEXCAPIClient(MEXC_API_KEY, MEXC_SECRET_KEY)
+    
+    # Cargar UIDs de referidos al inicio
+    logger.info("📡 Cargando UIDs de referidos...")
+    await mexc_client.get_referral_uids()
+    
+    # Crear bot de Telegram
     bot = TelegramBot(TELEGRAM_TOKEN, mexc_client, VIP_GROUP_ID)
     
+    # Crear aplicación
     application = Application.builder().token(TELEGRAM_TOKEN).build()
     
-    # Handlers
+    # Añadir handlers
     application.add_handler(CommandHandler("start", bot.start_command))
     application.add_handler(CommandHandler("verify", bot.verify_command))
     application.add_handler(CallbackQueryHandler(bot.verify_uid_callback, pattern="verify_uid"))
@@ -263,12 +260,8 @@ def main():
     
     logger.info("✅ Bot del reto iniciado correctamente. Esperando mensajes...")
     
-    # Cargar UIDs al inicio
-    async def load_uids():
-        await mexc_client.get_referral_uids()
-    
-    asyncio.create_task(load_uids())
-    application.run_polling()
+    # Iniciar bot
+    await application.run_polling()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
