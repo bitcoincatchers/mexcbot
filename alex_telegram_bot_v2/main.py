@@ -11,13 +11,10 @@ import aiohttp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-# Configuración de logging CORREGIDA
+# Configuración de logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO,
-    handlers=[
-        logging.StreamHandler()  # Solo consola, sin archivo
-    ]
+    level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
@@ -44,7 +41,6 @@ class MEXCAPIClient:
             await self.session.close()
             
     def generate_signature(self, params: str) -> str:
-        """Genera la firma HMAC SHA256 para la autenticación"""
         return hmac.new(
             self.secret_key.encode('utf-8'),
             params.encode('utf-8'),
@@ -52,7 +48,6 @@ class MEXCAPIClient:
         ).hexdigest()
     
     async def get_referral_uids(self):
-        """Obtiene los UIDs de referidos desde la API de MEXC"""
         try:
             await self.create_session()
             
@@ -76,24 +71,16 @@ class MEXCAPIClient:
             async with self.session.get(url, params=params, headers=headers) as response:
                 if response.status == 200:
                     data = await response.json()
-                    logger.info(f"Datos de rebate obtenidos: {data}")
+                    logger.info(f"Datos de rebate obtenidos correctamente")
                     
                     uids = []
-                    if isinstance(data, list):
-                        for item in data:
+                    if isinstance(data, dict) and 'data' in data:
+                        for item in data['data']:
                             if isinstance(item, dict) and 'uid' in item:
                                 uids.append(str(item['uid']))
-                    elif isinstance(data, dict):
-                        if 'uid' in data:
-                            uids.append(str(data['uid']))
-                        for key, value in data.items():
-                            if isinstance(value, list):
-                                for item in value:
-                                    if isinstance(item, dict) and 'uid' in item:
-                                        uids.append(str(item['uid']))
                     
                     self.referral_uids = list(set(uids))
-                    logger.info(f"UIDs de referidos encontrados: {self.referral_uids}")
+                    logger.info(f"UIDs de referidos encontrados: {len(self.referral_uids)} UIDs")
                     return self.referral_uids
                 else:
                     logger.error(f"Error al obtener datos de rebate: {response.status}")
@@ -102,12 +89,12 @@ class MEXCAPIClient:
         except Exception as e:
             logger.error(f"Error al obtener UIDs de referidos: {e}")
             return []
+        finally:
+            await self.close_session()
     
     async def verify_uid(self, uid: str) -> bool:
-        """Verifica si un UID está en la lista de referidos"""
         if not self.referral_uids:
             await self.get_referral_uids()
-        
         return str(uid) in self.referral_uids
 
 class TelegramBot:
@@ -115,12 +102,9 @@ class TelegramBot:
         self.token = token
         self.mexc_client = mexc_client
         self.vip_group_id = vip_group_id
-        self.application = None
-        # Regex para detectar UIDs de 8 dígitos
         self.uid_pattern = re.compile(r'\b\d{8}\b')
         
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Maneja el comando /start con el nuevo mensaje"""
         welcome_message = """
 🚀 ¡Bienvenido al reto de 50$ a 500$ con Cripto Trading! 🚀
 
@@ -143,12 +127,10 @@ Y pega tu numero de UID que se forma por 8 dígitos.
         
         await update.message.reply_text(
             welcome_message,
-            reply_markup=reply_markup,
-            parse_mode='Markdown'
+            reply_markup=reply_markup
         )
     
     async def verify_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Maneja el comando /verify"""
         verification_message = """
 🔍 **Verificación de UID de MEXC**
 
@@ -163,15 +145,10 @@ Por favor envía tu UID de MEXC (8 dígitos).
 📱 **Envía tu UID** (ejemplo: 12345678)
         """
         
-        await update.message.reply_text(
-            verification_message,
-            parse_mode='Markdown'
-        )
-        
+        await update.message.reply_text(verification_message)
         context.user_data['awaiting_uid'] = True
     
     async def verify_uid_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Maneja el callback de verificación de UID"""
         query = update.callback_query
         await query.answer()
         
@@ -189,53 +166,35 @@ Por favor envía tu UID de MEXC (8 dígitos).
 📱 **Envía tu UID** (ejemplo: 12345678)
         """
         
-        await query.edit_message_text(
-            verification_message,
-            parse_mode='Markdown'
-        )
-        
+        await query.edit_message_text(verification_message)
         context.user_data['awaiting_uid'] = True
     
     def extract_uid_from_message(self, text: str) -> str:
-        """Extrae UID de 8 dígitos del mensaje usando regex"""
-        # Buscar números de 8 dígitos exactos
         matches = self.uid_pattern.findall(text)
         return matches[0] if matches else None
     
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Maneja todos los mensajes con detección inteligente de UID"""
         text = update.message.text.strip()
-        
-        # Extraer UID del mensaje
         uid = self.extract_uid_from_message(text)
         
         if uid:
-            # UID detectado automáticamente
             await self.verify_uid_process(update, context, uid)
         elif context.user_data.get('awaiting_uid', False):
-            # Usuario estaba esperando enviar UID después de /verify
             await update.message.reply_text(
                 "❌ **UID inválido**\n\n"
-                "Por favor, envía exactamente 8 dígitos. Ejemplo: 12345678",
-                parse_mode='Markdown'
+                "Por favor, envía exactamente 8 dígitos. Ejemplo: 12345678"
             )
-        else:
-            # Mensaje normal, no hacer nada especial
-            pass
     
     async def verify_uid_process(self, update: Update, context: ContextTypes.DEFAULT_TYPE, uid: str):
-        """Procesa la verificación del UID"""
         verification_msg = await update.message.reply_text(
             "🔄 **Verificando tu UID...**\n\n"
-            "Estoy comprobando si eres un referido de Alex en MEXC.",
-            parse_mode='Markdown'
+            "Estoy comprobando si eres un referido de Alex en MEXC."
         )
         
         try:
             is_verified = await self.mexc_client.verify_uid(uid)
             
             if is_verified:
-                # UID verificado - mensaje de éxito
                 success_message = f"""
 ✅ **Perfecto!** , hemos verificado tu numero de UID y estás registrado correctamente, puedes unirte al reto 50$ - 500$ haciendo click aquí:
 
@@ -249,16 +208,10 @@ Por favor envía tu UID de MEXC (8 dígitos).
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
-                await verification_msg.edit_text(
-                    success_message,
-                    reply_markup=reply_markup,
-                    parse_mode='Markdown'
-                )
-                
+                await verification_msg.edit_text(success_message, reply_markup=reply_markup)
                 logger.info(f"Usuario verificado: {update.effective_user.id}, UID: {uid}")
                 
             else:
-                # UID no verificado - mensaje de fallo
                 fail_message = """
 ❌ **Vaya!** , parece que no encontramos tu UID de usuario.
 
@@ -282,63 +235,40 @@ Si tienes algún problema contacta con alex directamente haciendo click aquí:
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
-                await verification_msg.edit_text(
-                    fail_message,
-                    reply_markup=reply_markup,
-                    parse_mode='Markdown'
-                )
-                
+                await verification_msg.edit_text(fail_message, reply_markup=reply_markup)
                 logger.info(f"Usuario NO verificado: {update.effective_user.id}, UID: {uid}")
                 
         except Exception as e:
             logger.error(f"Error en verificación: {e}")
             await verification_msg.edit_text(
                 "❌ **Error de Verificación**\n\n"
-                "Hubo un problema técnico. Por favor, inténtalo de nuevo en unos minutos.\n\n"
-                "Si el problema persiste, contacta con Alex: @alex.worksout",
-                parse_mode='Markdown'
+                "Hubo un problema técnico. Por favor, inténtalo de nuevo en unos minutos."
             )
         
-        # Limpiar estado
         context.user_data['awaiting_uid'] = False
-    
-    async def setup_application(self):
-        """Configura la aplicación de Telegram"""
-        self.application = Application.builder().token(self.token).build()
-        
-        # Handlers
-        self.application.add_handler(CommandHandler("start", self.start_command))
-        self.application.add_handler(CommandHandler("verify", self.verify_command))
-        self.application.add_handler(CallbackQueryHandler(self.verify_uid_callback, pattern="verify_uid"))
-        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
-        
-        return self.application
 
-async def main():
-    """Función principal"""
+def main():
     logger.info("🚀 Iniciando bot del reto 50$ - 500$ de Alex...")
     
-    # Crear cliente MEXC
     mexc_client = MEXCAPIClient(MEXC_API_KEY, MEXC_SECRET_KEY)
-    
-    # Cargar UIDs de referidos al inicio
-    logger.info("📡 Cargando UIDs de referidos...")
-    await mexc_client.get_referral_uids()
-    
-    # Crear bot de Telegram
     bot = TelegramBot(TELEGRAM_TOKEN, mexc_client, VIP_GROUP_ID)
     
-    # Configurar aplicación
-    application = await bot.setup_application()
+    application = Application.builder().token(TELEGRAM_TOKEN).build()
     
-    # Iniciar bot
+    # Handlers
+    application.add_handler(CommandHandler("start", bot.start_command))
+    application.add_handler(CommandHandler("verify", bot.verify_command))
+    application.add_handler(CallbackQueryHandler(bot.verify_uid_callback, pattern="verify_uid"))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bot.handle_message))
+    
     logger.info("✅ Bot del reto iniciado correctamente. Esperando mensajes...")
-    await application.run_polling()
+    
+    # Cargar UIDs al inicio
+    async def load_uids():
+        await mexc_client.get_referral_uids()
+    
+    asyncio.create_task(load_uids())
+    application.run_polling()
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("🛑 Bot detenido por el usuario")
-    except Exception as e:
-        logger.error(f"❌ Error crítico: {e}")
+    main()
